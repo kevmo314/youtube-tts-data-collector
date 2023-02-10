@@ -71,29 +71,25 @@ def ingest(i, url):
 
 def main():
     print("gpus: %d" % torch.cuda.device_count())
-    while True:
-        host = sys.argv[1]
-        req = requests.get(host)
-        if req.status_code != 200:
-            # exiting
-            break
-        if req.text == "":
-            continue # no work
-        pqdm(enumerate(req.text.splitlines()), ingest, n_jobs=4 * torch.cuda.device_count(), argument_type='args')
-        # tgz the data directory
-        print("compressing data")
-        with tarfile.open("data.tar.gz", "w:gz") as tar:
-            tar.add("data-client", arcname=os.path.basename("data"))
-        # delete the data directory
-        print("deleting data")
-        shutil.rmtree("data-client")
-        # post the tgz file to the server
-        print("posting data")
-        with open("data.tar.gz", "rb") as f:
-            requests.post(host, data=f)
-        # delete the tgz file
-        print("deleting tgz")
-        os.remove("data.tar.gz")
+    host = sys.argv[1]
+    req = requests.get(host)
+    if req.status_code != 200 or req.text == "":
+        return
+    pqdm(enumerate(req.text.splitlines()), ingest, n_jobs=4 * torch.cuda.device_count(), argument_type='args')
+    # tgz the data directory
+    print("compressing data")
+    with tarfile.open("data.tar.gz", "w:gz") as tar:
+        tar.add("data-client", arcname=os.path.basename("data"))
+    # delete the data directory
+    print("deleting data")
+    shutil.rmtree("data-client")
+    # post the tgz file to the server
+    print("posting data")
+    with open("data.tar.gz", "rb") as f:
+        requests.post(host, data=f)
+    # delete the tgz file
+    print("deleting tgz")
+    os.remove("data.tar.gz")
     
 
 if __name__ == "__main__":

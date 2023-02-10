@@ -30,7 +30,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.end_headers()
-        urls = random.sample(urls, 4)
+        urls = random.sample(urls, 16)
         self.wfile.write("\n".join(urls).encode("utf-8"))
         
 
