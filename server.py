@@ -2,7 +2,9 @@ import http.server
 import io
 import os
 import random
+import shutil
 import tarfile
+import uuid
 
 from pytube import YouTube
 
@@ -10,8 +12,11 @@ from pytube import YouTube
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_POST(self):
         data = self.rfile.read(int(self.headers["Content-Length"]))
+        tmp = uuid.uuid4().hex
         with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tf:
-            tf.extractall()
+            tf.extractall(tmp)
+        shutil.copytree(os.path.join(tmp, "data"), "data")
+        shutil.rmtree(tmp)
         self.send_response(200)
         self.end_headers()
     
@@ -25,7 +30,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.end_headers()
-        urls = random.sample(urls, 16)
+        urls = random.sample(urls, 4)
         self.wfile.write("\n".join(urls).encode("utf-8"))
         
 

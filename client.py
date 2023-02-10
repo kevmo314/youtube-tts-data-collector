@@ -35,10 +35,8 @@ def ingest(i, url):
     yt = YouTube(url.strip())
 
     print("downloading %s" % yt.video_id)
-    dir = "data-client/yt-%s" % yt.video_id
-    os.makedirs(dir)
     # pick the audio stream
-    stream = yt.streams.filter(only_audio=True, audio_codec="opus").order_by("abr").desc().first()
+    stream = yt.streams.filter(only_audio=True).order_by("abr").desc().first()
     # download the audio
     if stream is None:
         return
@@ -46,6 +44,9 @@ def ingest(i, url):
     result = model.transcribe(webmfile, language="en")
     lines = nltk.tokenize.sent_tokenize(result["text"])
     tsfile = webmfile + '.transcript.txt'
+
+    dir = "data-client/yt-%s" % yt.video_id
+    os.makedirs(dir)
 
     with open(tsfile, 'w') as f:
         f.write('\n'.join(lines))
@@ -55,8 +56,8 @@ def ingest(i, url):
             # ignore the first segment because it often contains an intro or something.
             continue
         key = "data-client/yt-%s/%04d" % (yt.video_id, i)
-        if end - begin < 5:
-            # ignore segments less than 5 seconds because they are too noisy.
+        if end - begin < 3:
+            # ignore segments less than 3 seconds because they are too noisy.
             continue
         try:
             ffmpeg.input(webmfile, ss=begin, to=end).output(key + ".wav").run(overwrite_output=True, quiet=True)
@@ -69,7 +70,7 @@ def ingest(i, url):
     os.remove(tsfile)
 
 def main():
-    print("gpus: %d" % (2 * torch.cuda.device_count()))
+    print("gpus: %d" % torch.cuda.device_count())
     while True:
         host = sys.argv[1]
         req = requests.get(host)
@@ -78,14 +79,14 @@ def main():
             break
         if req.text == "":
             continue # no work
-        pqdm(enumerate(req.text.splitlines()), ingest, n_jobs=2 * torch.cuda.device_count(), argument_type='args')
+        pqdm(enumerate(req.text.splitlines()), ingest, n_jobs=4 * torch.cuda.device_count(), argument_type='args')
         # tgz the data directory
         print("compressing data")
         with tarfile.open("data.tar.gz", "w:gz") as tar:
             tar.add("data-client", arcname=os.path.basename("data"))
         # delete the data directory
         print("deleting data")
-        shutil.rmtree("data")
+        shutil.rmtree("data-client")
         # post the tgz file to the server
         print("posting data")
         with open("data.tar.gz", "rb") as f:
