@@ -25,8 +25,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.end_headers()
-        url = random.choice(urls, 16)
-        self.wfile.write(url.encode("utf-8"))
+        urls = random.sample(urls, 16)
+        self.wfile.write("\n".join(urls).encode("utf-8"))
         
 
 if __name__ == "__main__":

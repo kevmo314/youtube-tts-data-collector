@@ -75,7 +75,7 @@ def main():
         if req.status_code != 200:
             # exiting
             break
-        pqdm(ingest, enumerate(req.text.splitlines()), processes=2 * torch.cuda.device_count())
+        pqdm(ingest, enumerate(req.text.splitlines()), n_jobs=2 * torch.cuda.device_count())
         # tgz the data directory
         print("compressing data")
         with tarfile.open("data.tar.gz", "w:gz") as tar:
