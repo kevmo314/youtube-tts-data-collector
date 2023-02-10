@@ -79,7 +79,7 @@ def main():
             break
         if req.text == "":
             continue # no work
-        pqdm(enumerate(req.text.splitlines()), ingest, n_jobs=4 * torch.cuda.device_count(), argument_type='args')
+        pqdm(enumerate(req.text.splitlines()), ingest, n_jobs=torch.cuda.device_count(), argument_type='args')
         # tgz the data directory
         print("compressing data")
         with tarfile.open("data.tar.gz", "w:gz", compresslevel=3) as tar:
