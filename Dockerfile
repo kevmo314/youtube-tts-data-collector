@@ -12,7 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Install Python dependencies
 COPY . /app
 
-RUN pip3 install --no-cache-dir -r /app/requirements.txt
+# numpy needs to be installed manually first.
+RUN pip3 install numpy
+RUN pip3 install -r /app/requirements.txt
 
 # Set the working directory to /app
 WORKDIR /app
