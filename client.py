@@ -1,7 +1,10 @@
+import itertools
+import multiprocessing
 import os
 import shutil
 import sys
 import tarfile
+import uuid
 
 import aeneas.executetask
 import aeneas.task
@@ -28,7 +31,7 @@ def align(file, text):
         yield segment.begin, segment.end
 
 
-def ingest(i, url):
+def ingest(i, td, url):
     model = whisper.load_model('small.en', device="cuda:%d" % (i % torch.cuda.device_count()), in_memory=True)
 
     # download the video
@@ -45,7 +48,7 @@ def ingest(i, url):
     lines = nltk.tokenize.sent_tokenize(result["text"])
     tsfile = webmfile + '.transcript.txt'
 
-    dir = "data-client/yt-%s" % yt.video_id
+    dir = td + "/yt-%s" % yt.video_id
     os.makedirs(dir)
 
     with open(tsfile, 'w') as f:
@@ -55,7 +58,7 @@ def ingest(i, url):
         if i == 0:
             # ignore the first segment because it often contains an intro or something.
             continue
-        key = "data-client/yt-%s/%04d" % (yt.video_id, i)
+        key = td + "/yt-%s/%04d" % (yt.video_id, i)
         if end - begin < 3:
             # ignore segments less than 3 seconds because they are too noisy.
             continue
@@ -69,31 +72,38 @@ def ingest(i, url):
     os.remove(webmfile)
     os.remove(tsfile)
 
-def main():
-    print("gpus: %d" % torch.cuda.device_count())
-    for _ in range(16):
-        host = sys.argv[1]
+def run(i, host):
+    while True:
+        td = uuid.uuid4().hex
         req = requests.get(host)
         if req.status_code != 200:
             # exiting
-            break
+            return
         if req.text == "":
             continue # no work
-        pqdm(enumerate(req.text.splitlines()), ingest, n_jobs=torch.cuda.device_count(), argument_type='args')
+        ingest(i, td, req.text)
+
         # tgz the data directory
         print("compressing data")
-        with tarfile.open("data.tar.gz", "w:gz", compresslevel=3) as tar:
-            tar.add("data-client", arcname=os.path.basename("data"))
+        with tarfile.open("%s.tar.gz" % td, "w:gz", compresslevel=3) as tar:
+            tar.add(td, arcname=os.path.basename("data"))
         # delete the data directory
         print("deleting data")
-        shutil.rmtree("data-client")
+        shutil.rmtree(td)
         # post the tgz file to the server
         print("posting data")
-        with open("data.tar.gz", "rb") as f:
+        with open("%s.tar.gz" % td, "rb") as f:
             requests.post(host, data=f)
         # delete the tgz file
         print("deleting tgz")
-        os.remove("data.tar.gz")
+        os.remove("%s.tar.gz" % td)
+
+
+def main():
+    print("gpus: %d" % torch.cuda.device_count())
+    hosts = [sys.argv[1]] * torch.cuda.device_count()
+    with multiprocessing.Pool(torch.cuda.device_count()) as pool:
+        pool.starmap(run, enumerate(hosts))
     
 
 if __name__ == "__main__":
