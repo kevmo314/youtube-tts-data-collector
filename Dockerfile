@@ -4,6 +4,7 @@ FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
+    git \
     ffmpeg \
     libespeak-dev \
     && rm -rf /var/lib/apt/lists/*
