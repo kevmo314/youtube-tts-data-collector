@@ -1,4 +1,5 @@
 import os
+import shutil
 import sys
 import tarfile
 
@@ -7,6 +8,7 @@ import aeneas.task
 import ffmpeg
 import nltk.tokenize
 import requests
+import torch
 from aeneas.syncmap import SyncMapFragment
 from pqdm.processes import pqdm
 from pytube import YouTube
@@ -26,8 +28,8 @@ def align(file, text):
         yield segment.begin, segment.end
 
 
-def ingest(url):
-    model = whisper.load_model('small.en', device="cuda:0", in_memory=True)
+def ingest(i, url):
+    model = whisper.load_model('small.en', device="cuda:%d" % (i % torch.cuda.device_count()), in_memory=True)
 
     # download the video
     yt = YouTube(url.strip())
@@ -67,16 +69,27 @@ def ingest(url):
     os.remove(tsfile)
 
 def main():
-    host = sys.argv[1]
-    req = requests.get(host)
-    for url in tqdm(req.text.splitlines()):
-        ingest(url)
-    # tgz the data directory
-    with tarfile.open("data.tar.gz", "w:gz") as tar:
-        tar.add("data", arcname=os.path.basename("data"))
-    # post the tgz file to the server
-    with open("data.tar.gz", "rb") as f:
-        requests.post(host, data=f.read())
+    while True:
+        host = sys.argv[1]
+        req = requests.get(host)
+        if req.status_code != 200:
+            # exiting
+            break
+        pqdm(ingest, enumerate(req.text.splitlines()), processes=2 * torch.cuda.device_count())
+        # tgz the data directory
+        print("compressing data")
+        with tarfile.open("data.tar.gz", "w:gz") as tar:
+            tar.add("data", arcname=os.path.basename("data"))
+        # delete the data directory
+        print("deleting data")
+        shutil.rmtree("data")
+        # post the tgz file to the server
+        print("posting data")
+        with open("data.tar.gz", "rb") as f:
+            requests.post(host, data=f)
+        # delete the tgz file
+        print("deleting tgz")
+        os.remove("data.tar.gz")
     
 
 if __name__ == "__main__":

@@ -1,32 +1,34 @@
 import http.server
+import io
 import os
+import random
+import tarfile
 
 from pytube import YouTube
-import tarfile
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    def __init__(self):
-        super().__init__()
-
-        with open("data.txt", "r") as f:
-            self.urls = f.readlines()
-        
-        # filter out urls that have already been downloaded
-        self.urls = [url for url in self.urls if not os.path.exists("data/yt-%s" % YouTube(url.strip()).video_id)]
-
     def do_POST(self):
-        with tarfile.open(fileobj=self.rfile, mode="r:gz") as tf:
+        data = self.rfile.read(int(self.headers["Content-Length"]))
+        with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as tf:
             tf.extractall()
         self.send_response(200)
         self.end_headers()
     
     def do_GET(self):
+        with open("data.txt", "r") as f:
+            urls = [url for url in f.readlines() if not os.path.exists("data/yt-%s" % YouTube(url.strip()).video_id)]
+            if len(urls) == 0:
+                self.send_response(404)
+                self.end_headers()
+                return
         self.send_response(200)
         self.send_header("Content-Type", "text/plain")
         self.end_headers()
-        self.wfile.write(self.urls.pop().encode("utf-8"))
+        url = random.choice(urls, 16)
+        self.wfile.write(url.encode("utf-8"))
         
 
 if __name__ == "__main__":
     httpd = http.server.HTTPServer(("", 8000), Handler)
+    httpd.serve_forever()
