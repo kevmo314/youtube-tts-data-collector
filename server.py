@@ -17,7 +17,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
     
     def do_GET(self):
         with open("data.txt", "r") as f:
-            urls = [url for url in f.readlines() if not os.path.exists("data/yt-%s" % YouTube(url.strip()).video_id)]
+            urls = [url.strip() for url in f.readlines() if not os.path.exists("data/yt-%s" % YouTube(url.strip()).video_id)]
             if len(urls) == 0:
                 self.send_response(404)
                 self.end_headers()

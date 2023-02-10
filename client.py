@@ -33,9 +33,10 @@ def ingest(i, url):
 
     # download the video
     yt = YouTube(url.strip())
-    dir = "data/yt-%s" % yt.video_id
-    if os.path.exists(dir):
-        return
+
+    print("downloading %s" % yt.video_id)
+    dir = "data-client/yt-%s" % yt.video_id
+    os.makedirs(dir)
     # pick the audio stream
     stream = yt.streams.filter(only_audio=True, audio_codec="opus").order_by("abr").desc().first()
     # download the audio
@@ -49,12 +50,11 @@ def ingest(i, url):
     with open(tsfile, 'w') as f:
         f.write('\n'.join(lines))
     
-    os.makedirs(dir)
     for i, (begin, end) in enumerate(align(webmfile, tsfile)):
         if i == 0:
             # ignore the first segment because it often contains an intro or something.
             continue
-        key = "data/yt-%s/%04d" % (yt.video_id, i)
+        key = "data-client/yt-%s/%04d" % (yt.video_id, i)
         if end - begin < 5:
             # ignore segments less than 5 seconds because they are too noisy.
             continue
@@ -69,17 +69,20 @@ def ingest(i, url):
     os.remove(tsfile)
 
 def main():
+    print("gpus: %d" % (2 * torch.cuda.device_count()))
     while True:
         host = sys.argv[1]
         req = requests.get(host)
         if req.status_code != 200:
             # exiting
             break
-        pqdm(enumerate(req.text.splitlines()), ingest, n_jobs=2 * torch.cuda.device_count())
+        if req.text == "":
+            continue # no work
+        pqdm(enumerate(req.text.splitlines()), ingest, n_jobs=2 * torch.cuda.device_count(), argument_type='args')
         # tgz the data directory
         print("compressing data")
         with tarfile.open("data.tar.gz", "w:gz") as tar:
-            tar.add("data", arcname=os.path.basename("data"))
+            tar.add("data-client", arcname=os.path.basename("data"))
         # delete the data directory
         print("deleting data")
         shutil.rmtree("data")
