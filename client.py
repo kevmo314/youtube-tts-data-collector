@@ -101,6 +101,7 @@ def run(i, host):
 
 def main():
     print("gpus: %d" % torch.cuda.device_count())
+    whisper.load_model('small.en') # preload model
     hosts = [sys.argv[1]] * torch.cuda.device_count()
     with multiprocessing.Pool(torch.cuda.device_count()) as pool:
         pool.starmap(run, enumerate(hosts))
