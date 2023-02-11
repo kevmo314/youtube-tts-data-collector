@@ -1,7 +1,6 @@
 import itertools
 from torch import multiprocessing
 multiprocessing.set_start_method('spawn')
-import multiprocessing
 import os
 import shutil
 import sys
