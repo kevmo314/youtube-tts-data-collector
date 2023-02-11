@@ -1,6 +1,5 @@
 import itertools
 from torch import multiprocessing
-multiprocessing.set_start_method('spawn')
 import os
 import shutil
 import sys
@@ -32,9 +31,7 @@ def align(file, text):
         yield segment.begin, segment.end
 
 
-def ingest(i, td, url):
-    model = whisper.load_model('small.en', device="cuda:%d" % (i % torch.cuda.device_count()), in_memory=True)
-
+def ingest(model, td, url):
     # download the video
     yt = YouTube(url.strip())
 
@@ -74,6 +71,8 @@ def ingest(i, td, url):
     os.remove(tsfile)
 
 def run(i, host):
+    nltk.download('punkt') # download nltk tokenizer
+    model = whisper.load_model('small.en', device="cuda:%d" % (i % torch.cuda.device_count()), in_memory=True)
     while True:
         td = uuid.uuid4().hex
         req = requests.get(host)
@@ -82,7 +81,7 @@ def run(i, host):
             return
         if req.text == "":
             continue # no work
-        ingest(i, td, req.text)
+        ingest(model, td, req.text)
 
         # tgz the data directory
         print("compressing data")
@@ -101,12 +100,7 @@ def run(i, host):
 
 
 def main():
-    print("gpus: %d" % torch.cuda.device_count())
-    whisper.load_model('small.en') # preload model
-    nltk.download('punkt') # download nltk tokenizer
-    hosts = [sys.argv[1]] * torch.cuda.device_count()
-    with multiprocessing.Pool(torch.cuda.device_count()) as pool:
-        pool.starmap(run, enumerate(hosts))
+    run(0, sys.argv[1])
     
 
 if __name__ == "__main__":
